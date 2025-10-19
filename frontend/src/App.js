@@ -28,6 +28,7 @@ const App = () => {
   const [authPassword, setAuthPassword] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [toasts, setToasts] = useState([]);
+  const isAuthed = !!token && !!user;
 
   const pushToast = ({ type = "success", text = "", timeout = 2500 }) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -50,6 +51,10 @@ const App = () => {
         setFiles(formatted);
         return;
       }
+      if (!isAuthed) {
+        pushToast({ type: "error", text: "Login to load projects from cloud" });
+        return;
+      }
       const res = await axios.get(`${API_BASE}/api/projects/${projectId}`);
       const data = res.data;
       const formatted = {};
@@ -69,11 +74,15 @@ const App = () => {
 
     try {
       localStorage.setItem(`cipher:project:${projectId}`, JSON.stringify({ projectId, files }));
+      if (!isAuthed) {
+        pushToast({ type: "success", text: "Saved locally. Login to save to cloud" });
+        return;
+      }
       await axios.put(`${API_BASE}/api/projects/${projectId}`, {
         name: "My CipherStudio Project",
         files: projectFiles
       });
-      pushToast({ type: "success", text: "Project saved" });
+      pushToast({ type: "success", text: "Project saved to cloud" });
     } catch (err) {
       console.error(err);
       pushToast({ type: "error", text: "Save failed" });
@@ -298,9 +307,27 @@ ${renderLines || ""}
           <div className="section-title">PROJECT</div>
           <div className="control-grid cols-4">
             <input className="input" value={projectInput} onChange={(e) => setProjectInput(e.target.value)} placeholder="projectId" />
-            <button className="btn" onClick={() => setProjectId(projectInput)}>Set</button>
-            <button className="btn" onClick={loadProject}>Load</button>
-            <button className="btn btn-primary" onClick={saveProject}>Save</button>
+            <button
+              className="btn"
+              onClick={() => {
+                if (!isAuthed) return pushToast({ type: "error", text: "Login to manage cloud projects" });
+                setProjectId(projectInput);
+              }}
+            >Set</button>
+            <button
+              className="btn"
+              onClick={() => {
+                if (!isAuthed) return pushToast({ type: "error", text: "Login to load from cloud" });
+                loadProject();
+              }}
+            >Load</button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (!isAuthed) return pushToast({ type: "error", text: "Login to save to cloud" });
+                saveProject();
+              }}
+            >Save</button>
           </div>
 
           <div className="control-row mt-8">
