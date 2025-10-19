@@ -50,7 +50,7 @@ A browser-based React IDE that lets you create, edit, preview, and persist React
    You should see: `✅ MongoDB connected` and `🚀 Server running on port 5000`.
 
 ### Backend API
-- `POST /api/projects` Create project (optional; PUT also upserts)
+- `GET /` Health text
 - `GET /api/projects/:projectId` Load project
 - `PUT /api/projects/:projectId` Upsert project
 - `POST /api/auth/register` Body: `{ username, email, password }`
@@ -62,40 +62,31 @@ A browser-based React IDE that lets you create, edit, preview, and persist React
    ```bash
    npm install
    ```
-2. Start the dev server (if using CRA/Vite) or open the host app as configured:
+2. Configure API base (Render URL):
+   - `frontend/src/App.js` uses `REACT_APP_API_BASE` falling back to `http://localhost:5000`.
+   - For local dev against Render:
+     ```bash
+     # PowerShell
+     $env:REACT_APP_API_BASE="https://cipherstudio.onrender.com"; npm start
+     ```
+3. Start locally:
    ```bash
    npm start
    ```
-3. Ensure backend is available at `http://localhost:5000`. The frontend calls absolute URLs. If deploying, update the API base as needed.
+
+## Deployments
+- **Backend (Render):** Create Web Service with root `backend/`, Build `npm install`, Start `node server.js`, set `MONGO_URI` and `JWT_SECRET` env vars.
+- **Frontend (Vercel):** Root `frontend/`, Build `npm run build`, Output `build`, set env `REACT_APP_API_BASE=https://cipherstudio.onrender.com`.
 
 ## Using CipherStudio
-- **Files panel:**
-  - Add a new file (e.g., `Header.js`). Components are generated in PascalCase with default export.
-  - Rename files or folders using inline tools.
-  - Toggle **Auto Render** to auto-generate `/App.js` that imports and renders components.
-- **Project controls:**
-  - Set a `projectId` and click **Load** to fetch from localStorage/backend.
-  - Click **Save** to upsert to backend and cache to localStorage.
-  - **Autosave** saves to localStorage on changes.
-- **Auth:**
-  - Open `Login`/`Register` from topbar.
-  - Register requires `username`, `email`, `password`.
-  - Login accepts `username or email` + `password`.
-  - Success shows a toast and the topbar will greet you.
-
-## Deployment
-- **Backend:** Render/Railway/Heroku. Set `MONGO_URI` and `JWT_SECRET`. Expose port 5000.
-- **Frontend:** Netlify/Vercel. If your API is hosted elsewhere, update the frontend to use that base URL.
+- **Files panel:** Add, rename, delete files; optional folder rename.
+- **Auto Render:** Toggle to auto-generate imports for components in a generated `/App.js`.
+- **Projects:** Set a `projectId`, Load, Save. LocalStorage copy may take precedence.
+- **Auth:** Register (username, email, password). Login (username/email + password). Success toasts appear.
 
 ## Notes
-- LocalStorage project copy takes precedence during load for speed. Use a new `projectId` or clear the local copy to force a backend fetch.
-- Case-sensitive paths in Sandpack: use consistent casing in imports and filenames.
-
-## Roadmap / Ideas
-- Resizable sidebar, drag-and-drop reordering
-- In-editor code formatting, linting, and TypeScript support
-- Shareable project links and GitHub OAuth
-- One-click Deploy of the current project to Netlify/Vercel
+- Restrict CORS in production if desired.
+- Clear localStorage key `cipher:project:<id>` to force backend fetch.
 
 ## License
 MIT

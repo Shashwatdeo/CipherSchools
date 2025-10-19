@@ -4,6 +4,8 @@ import { Sandpack } from "@codesandbox/sandpack-react";
 import FileManager from "./components/FileManager";
 import "./styles.css";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 const App = () => {
   const [files, setFiles] = useState({
     "/App.js": { code: "export default function App(){ return <h1>Hello CipherStudio</h1> }" }
@@ -48,7 +50,7 @@ const App = () => {
         setFiles(formatted);
         return;
       }
-      const res = await axios.get(`http://localhost:5000/api/projects/${projectId}`);
+      const res = await axios.get(`${API_BASE}/api/projects/${projectId}`);
       const data = res.data;
       const formatted = {};
       data.files.forEach((f) => (formatted[f.name] = { code: f.content }));
@@ -67,7 +69,7 @@ const App = () => {
 
     try {
       localStorage.setItem(`cipher:project:${projectId}`, JSON.stringify({ projectId, files }));
-      await axios.put(`http://localhost:5000/api/projects/${projectId}`, {
+      await axios.put(`${API_BASE}/api/projects/${projectId}`, {
         name: "My CipherStudio Project",
         files: projectFiles
       });
@@ -117,7 +119,7 @@ const App = () => {
         pushToast({ type: "error", text: "Please fill username, email and password" });
         return;
       }
-      const res = await axios.post("http://localhost:5000/api/auth/register", {
+      const res = await axios.post(`${API_BASE}/api/auth/register`, {
         username: authUsername,
         email: authEmail,
         password: authPassword,
@@ -148,7 +150,7 @@ const App = () => {
         pushToast({ type: "error", text: "Enter password" });
         return;
       }
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, {
         username: authUsername || undefined,
         email: authEmail || undefined,
         password: authPassword,
@@ -245,7 +247,7 @@ ${renderLines || ""}
     const init = async () => {
       if (!token) return;
       try {
-        const res = await axios.get("http://localhost:5000/api/auth/me", {
+        const res = await axios.get(`${API_BASE}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res?.data?.user) {
