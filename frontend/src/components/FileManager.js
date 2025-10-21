@@ -72,7 +72,7 @@ const FileManager = ({ files, setFiles, autoRender }) => {
     const names = Object.keys(files);
     const toRename = names.filter((n) => n.startsWith(oldPrefix));
     if (toRename.length === 0) {
-      alert(`No files found under ${oldPrefix}. Create files like \"${oldBase}/Header\" first.`);
+      alert(`No files found under ${oldPrefix}. Create files like "${oldBase}/Header" first.`);
       return;
     }
 

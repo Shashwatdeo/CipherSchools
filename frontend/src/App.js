@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from "axios";
 import { Sandpack } from "@codesandbox/sandpack-react";
 import FileManager from "./components/FileManager";
+import Login from "./components/auth/Login";
+import Register from "./components/auth/Register";
 import "./styles.css";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
@@ -32,18 +34,18 @@ const App = () => {
   const [apiStatus, setApiStatus] = useState("unknown"); // online | offline | unknown
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState("");
-  const [pendingAutosave, setPendingAutosave] = useState(false);
+  const autosaveDirtyRef = useRef(false);
 
-  const pushToast = ({ type = "success", text = "", timeout = 2500 }) => {
+  const pushToast = useCallback(({ type = "success", text = "", timeout = 2500 }) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     setToasts((prev) => [...prev, { id, type, text }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, timeout);
-  };
+  }, []);
 
   // Load project
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const local = localStorage.getItem(`cipher:project:${projectId}`);
       if (local) {
@@ -67,7 +69,7 @@ const App = () => {
     } catch (err) {
       console.log("No project found, using default");
     }
-  };
+  }, [projectId, isAuthed, pushToast]);
 
   // Save project
   const saveProject = async () => {
@@ -99,13 +101,51 @@ const App = () => {
     }
   };
 
-  useEffect(() => {
-    loadProject();
-  }, []);
+  // Overlay auth submit handlers
+  const submitOverlayLogin = async ({ identity, password }) => {
+    if (!identity || !password) throw new Error("Please fill username/email and password");
+    try {
+      const isEmail = identity.includes("@");
+      const res = await axios.post(`${API_BASE}/api/auth/login`, {
+        username: isEmail ? undefined : identity,
+        email: isEmail ? identity : undefined,
+        password,
+      });
+      const { user: u, token: t } = res.data;
+      setUser(u);
+      setToken(t);
+      localStorage.setItem("cipher:user", JSON.stringify(u));
+      localStorage.setItem("cipher:token", t);
+      setAuthOpen(false);
+      pushToast({ type: "success", text: `Logged in as ${u.username}` });
+    } catch (err) {
+      throw new Error(err?.response?.data?.message || "Login failed");
+    }
+  };
+
+  const submitOverlayRegister = async ({ username, email, password }) => {
+    if (!username || !email || !password) throw new Error("Please fill username, email and password");
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/register`, {
+        username,
+        email,
+        password,
+      });
+      const { user: u, token: t } = res.data;
+      setUser(u);
+      setToken(t);
+      localStorage.setItem("cipher:user", JSON.stringify(u));
+      localStorage.setItem("cipher:token", t);
+      setAuthOpen(false);
+      pushToast({ type: "success", text: `Welcome, ${u.username}` });
+    } catch (err) {
+      throw new Error(err?.response?.data?.message || "Register failed");
+    }
+  };
 
   useEffect(() => {
     loadProject();
-  }, [projectId]);
+  }, [loadProject]);
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth);
@@ -124,19 +164,19 @@ const App = () => {
   useEffect(() => {
     if (!autosave) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    setPendingAutosave(true);
+    autosaveDirtyRef.current = true;
     autosaveTimer.current = setTimeout(() => {
       localStorage.setItem(`cipher:project:${projectId}`, JSON.stringify({ projectId, files }));
       setLastSavedAt(new Date().toLocaleTimeString());
-      if (pendingAutosave) {
+      if (autosaveDirtyRef.current) {
         pushToast({ type: "success", text: "Saved locally" });
-        setPendingAutosave(false);
+        autosaveDirtyRef.current = false;
       }
     }, 800);
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [files, projectId, autosave]);
+  }, [files, projectId, autosave, pushToast]);
 
   const handleRegister = async () => {
     try {
@@ -376,42 +416,7 @@ ${renderLines || ""}
             <span className="muted">{saving ? "Saving…" : lastSavedAt ? `Last saved ${lastSavedAt}` : ""}</span>
           </div>
 
-          {!user && authOpen && (
-            <>
-              <div className="section-title">ACCOUNT</div>
-              <div
-                className="control-grid"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    if (authMode === "login") return handleLogin();
-                    return handleRegister();
-                  }
-                  if (e.key === "Escape") setAuthOpen(false);
-                }}
-              >
-                <label className="label" htmlFor="auth-username">Username</label>
-                <input id="auth-username" className="input" placeholder="username" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} />
-                <label className="label" htmlFor="auth-email">Email</label>
-                <input id="auth-email" className="input" placeholder="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-                <label className="label" htmlFor="auth-password">Password</label>
-                <input id="auth-password" className="input" placeholder="password" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
-              </div>
-              <div className="control-row mt-8">
-                {authMode === "login" ? (
-                  <button className="btn btn-primary" onClick={handleLogin} disabled={!((authUsername || authEmail) && authPassword)}>Login</button>
-                ) : (
-                  <button className="btn btn-primary" onClick={handleRegister} disabled={!(authUsername && authEmail && authPassword)}>Register</button>
-                )}
-                <button className="btn" onClick={() => setAuthOpen(false)}>Close</button>
-              </div>
-              {authMode === "register" && (
-                <div className="error">All fields are required to register.</div>
-              )}
-              {authMode === "login" && (!authPassword || (!authUsername && !authEmail)) && (
-                <div className="error">Provide username/email and password to login.</div>
-              )}
-            </>
-          )}
+          {/* Inline account block removed; using overlay below */}
         </aside>
 
         <main className="preview">
@@ -427,6 +432,22 @@ ${renderLines || ""}
           />
         </main>
       </div>
+      {!user && authOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
+          {authMode === "login" ? (
+            <Login
+              onSubmit={submitOverlayLogin}
+              onNavigateRegister={() => setAuthMode("register")}
+            />
+          ) : (
+            <Register
+              onSubmit={submitOverlayRegister}
+              onNavigateLogin={() => setAuthMode("login")}
+            />
+          )}
+        </div>
+      )}
+
       <div className="toast" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast-item ${t.type}`}>{t.text}</div>
