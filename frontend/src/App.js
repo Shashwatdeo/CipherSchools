@@ -29,6 +29,10 @@ const App = () => {
   const [authEmail, setAuthEmail] = useState("");
   const [toasts, setToasts] = useState([]);
   const isAuthed = !!token && !!user;
+  const [apiStatus, setApiStatus] = useState("unknown"); // online | offline | unknown
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState("");
+  const [pendingAutosave, setPendingAutosave] = useState(false);
 
   const pushToast = ({ type = "success", text = "", timeout = 2500 }) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -73,9 +77,11 @@ const App = () => {
     }));
 
     try {
+      setSaving(true);
       localStorage.setItem(`cipher:project:${projectId}`, JSON.stringify({ projectId, files }));
       if (!isAuthed) {
         pushToast({ type: "success", text: "Saved locally. Login to save to cloud" });
+        setLastSavedAt(new Date().toLocaleTimeString());
         return;
       }
       await axios.put(`${API_BASE}/api/projects/${projectId}`, {
@@ -83,9 +89,13 @@ const App = () => {
         files: projectFiles
       });
       pushToast({ type: "success", text: "Project saved to cloud" });
+      setLastSavedAt(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
       pushToast({ type: "error", text: "Save failed" });
+    }
+    finally {
+      setSaving(false);
     }
   };
 
@@ -114,8 +124,14 @@ const App = () => {
   useEffect(() => {
     if (!autosave) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setPendingAutosave(true);
     autosaveTimer.current = setTimeout(() => {
       localStorage.setItem(`cipher:project:${projectId}`, JSON.stringify({ projectId, files }));
+      setLastSavedAt(new Date().toLocaleTimeString());
+      if (pendingAutosave) {
+        pushToast({ type: "success", text: "Saved locally" });
+        setPendingAutosave(false);
+      }
     }, 800);
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -272,11 +288,28 @@ ${renderLines || ""}
     init();
   }, [token]);
 
+  // API Health badge
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        await axios.get(`${API_BASE}/`, { timeout: 4000 });
+        if (!cancelled) setApiStatus("online");
+      } catch {
+        if (!cancelled) setApiStatus("offline");
+      }
+    };
+    check();
+    const id = setInterval(check, 20000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   return (
     <div className="app-root" data-theme={theme}>
       <div className="topbar">
         <div className="brand">CipherStudio</div>
         <div className="top-actions">
+          <span className={`badge ${apiStatus}`}>{apiStatus === "online" ? "API Online" : apiStatus === "offline" ? "API Offline" : "API Checking..."}</span>
           <label className="switch">
             <input type="checkbox" checked={theme === "dark"} onChange={(e) => setTheme(e.target.checked ? "dark" : "light")} />
             Theme
@@ -340,15 +373,28 @@ ${renderLines || ""}
               Auto Render
             </label>
             <button className="btn" onClick={downloadProject}>Download</button>
+            <span className="muted">{saving ? "Saving…" : lastSavedAt ? `Last saved ${lastSavedAt}` : ""}</span>
           </div>
 
           {!user && authOpen && (
             <>
               <div className="section-title">ACCOUNT</div>
-              <div className="control-grid">
-                <input className="input" placeholder="username" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} />
-                <input className="input" placeholder="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-                <input className="input" placeholder="password" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
+              <div
+                className="control-grid"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (authMode === "login") return handleLogin();
+                    return handleRegister();
+                  }
+                  if (e.key === "Escape") setAuthOpen(false);
+                }}
+              >
+                <label className="label" htmlFor="auth-username">Username</label>
+                <input id="auth-username" className="input" placeholder="username" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} />
+                <label className="label" htmlFor="auth-email">Email</label>
+                <input id="auth-email" className="input" placeholder="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
+                <label className="label" htmlFor="auth-password">Password</label>
+                <input id="auth-password" className="input" placeholder="password" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
               </div>
               <div className="control-row mt-8">
                 {authMode === "login" ? (
@@ -381,7 +427,7 @@ ${renderLines || ""}
           />
         </main>
       </div>
-      <div className="toast">
+      <div className="toast" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast-item ${t.type}`}>{t.text}</div>
         ))}

@@ -36,9 +36,32 @@ const FileManager = ({ files, setFiles, autoRender }) => {
   };
 
   const renameFolder = () => {
-    if (!folderOld || !folderNew) return;
-    const oldPrefix = "/" + folderOld.replace(/^\/+|\/+$/g, "") + "/";
-    const newPrefix = "/" + folderNew.replace(/^\/+|\/+$/g, "") + "/";
+    if (!folderOld || !folderNew) {
+      alert("Enter both old and new folder names");
+      return;
+    }
+    const oldClean = folderOld.trim();
+    const newClean = folderNew.trim();
+    const normalizeFolder = (n) => {
+      const trimmed = n.trim().replace(/^\/+|\/+$/g, "");
+      if (!trimmed) return "";
+      const parts = trimmed.split("/").filter(Boolean);
+      // Remove an accidental file extension from the last segment only
+      parts[parts.length - 1] = parts[parts.length - 1].replace(/\.(js|jsx|ts|tsx)$/i, "");
+      return parts.join("/");
+    };
+    const oldBase = normalizeFolder(oldClean);
+    const newBase = normalizeFolder(newClean);
+    if (!oldBase || !newBase) {
+      alert("Folder names cannot be empty");
+      return;
+    }
+    if (oldBase === newBase) {
+      alert("Old and new folder names are the same");
+      return;
+    }
+    const oldPrefix = "/" + oldBase.replace(/^\/+|\/+$/g, "") + "/";
+    const newPrefix = "/" + newBase.replace(/^\/+|\/+$/g, "") + "/";
 
     if (!autoRender && Object.keys(files).some((f) => f === "/App.js" && f.startsWith(oldPrefix))) {
       alert("Cannot move /App.js when Auto Render is off");
@@ -48,7 +71,10 @@ const FileManager = ({ files, setFiles, autoRender }) => {
     const updated = { ...files };
     const names = Object.keys(files);
     const toRename = names.filter((n) => n.startsWith(oldPrefix));
-    if (toRename.length === 0) return;
+    if (toRename.length === 0) {
+      alert(`No files found under ${oldPrefix}. Create files like \"${oldBase}/Header\" first.`);
+      return;
+    }
 
     for (const oldName of toRename) {
       const newName = oldName.replace(oldPrefix, newPrefix);
@@ -133,15 +159,16 @@ const FileManager = ({ files, setFiles, autoRender }) => {
           placeholder="New file (e.g., Header)"
           value={newFileName}
           onChange={(e) => setNewFileName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") addFile(); }}
         />
         <div></div>
         <button className="btn" onClick={addFile}>Add File</button>
       </div>
 
       <div className="section-title">FOLDER TOOLS</div>
-      <div className="control-grid cols-3">
-        <input className="input" placeholder="old folder (e.g., components)" value={folderOld} onChange={(e) => setFolderOld(e.target.value)} />
-        <input className="input" placeholder="new folder (e.g., ui)" value={folderNew} onChange={(e) => setFolderNew(e.target.value)} />
+      <div className="control-grid cols-2-1">
+        <input className="input" placeholder="old folder (e.g., components)" value={folderOld} onChange={(e) => setFolderOld(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") renameFolder(); }} />
+        <input className="input" placeholder="new folder (e.g., ui)" value={folderNew} onChange={(e) => setFolderNew(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") renameFolder(); }} />
         <button className="btn" onClick={renameFolder}>Rename Folder</button>
       </div>
     </div>
