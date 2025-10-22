@@ -10,26 +10,35 @@ const FileManager = ({ files, setFiles, autoRender }) => {
   const addFile = () => {
     if (!newFileName) return alert("Enter a file name!");
 
-    // Ensure file ends with .js
-    let fileName = newFileName.endsWith(".js") ? newFileName : newFileName + ".js";
-    fileName = "/" + fileName; // Sandpack requires leading /
+    let name = newFileName.trim();
+    if (!name) return alert("Enter a file name!");
+    name = name.replace(/^\/+/, "");
+    const extMatch = name.match(/\.[a-z0-9]+$/i);
+    let ext = extMatch ? extMatch[0].toLowerCase() : "";
+    if (!ext) {
+      ext = ".js";
+      name += ext;
+    }
+    const fileName = "/" + name; // Sandpack requires leading /
 
     if (files[fileName]) return alert("File already exists!");
 
-    // Default React component template
-    const rawName = fileName.replace("/", "").replace(".js", "");
-    const componentName = rawName
-      .split(/[^a-zA-Z0-9]/)
-      .filter(Boolean)
-      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-      .join("");
-    const defaultCode = `export default function ${componentName}() {
-  return (
-    <div>
-      <h2>${componentName} Component</h2>
-    </div>
-  );
-}`;
+    let defaultCode = "";
+    if (ext === ".js" || ext === ".jsx") {
+      const base = name.split("/").pop().replace(/\.(js|jsx)$/i, "");
+      const componentName = base
+        .split(/[^a-zA-Z0-9]/)
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join("");
+      defaultCode = `export default function ${componentName}() {\n  return (\n    <div>\n      <h2>${componentName} Component</h2>\n    </div>\n  );\n}`;
+    } else if (ext === ".css") {
+      defaultCode = `/* ${name} */\n`; 
+    } else if (ext === ".html") {
+      defaultCode = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>${name}</title>\n</head>\n<body>\n  <div id=\"root\"></div>\n</body>\n</html>`;
+    } else {
+      defaultCode = "";
+    }
 
     setFiles({ ...files, [fileName]: { code: defaultCode } });
     setNewFileName("");
@@ -112,8 +121,11 @@ const FileManager = ({ files, setFiles, autoRender }) => {
       alert("Cannot rename /App.js when Auto Render is off");
       return;
     }
-    let target = renameValue.endsWith(".js") ? renameValue : renameValue + ".js";
-    target = "/" + target;
+    const oldExtMatch = name.match(/\.[^.]+$/);
+    const oldExt = oldExtMatch ? oldExtMatch[0] : "";
+    const raw = renameValue.trim().replace(/^\/+/, "");
+    const hasNewExt = /\.[^.]+$/.test(raw);
+    let target = "/" + raw + (hasNewExt ? "" : oldExt);
     if (files[target]) {
       alert("A file with this name already exists");
       return;

@@ -277,13 +277,13 @@ const App = () => {
 
     const componentFiles = entries
       .map(([name, file]) => ({ name, file }))
-      .filter(({ name }) => name.endsWith(".js"))
-      .filter(({ name }) => name !== "/App.js")
-      .filter(({ name }) => !/\/index\.js$/i.test(name))
+      .filter(({ name }) => /\.(js|jsx)$/i.test(name))
+      .filter(({ name }) => !/^\/App\.jsx?$/i.test(name))
+      .filter(({ name }) => !/\/index\.(js|jsx)$/i.test(name))
       .filter(({ file }) => looksLikeComponent(file?.code));
 
     const imports = componentFiles.map(({ name }) => {
-      const base = name.replace(/^\//, "").replace(/\.js$/i, "");
+      const base = name.replace(/^\//, "").replace(/\.(js|jsx)$/i, "");
       const comp = toPascal(base.split("/").pop() || base);
       return { comp, path: `./${base}` };
     });
